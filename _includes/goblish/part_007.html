@@ -1,0 +1,65 @@
+
+const VERSION_SEED = 'GAILEIA-GOBLISH-02';
+// Compatibility state equivalent to hashing the original v0.4 seed prefix.
+// Keeping this numeric state preserves all existing deterministic fallback words
+// while allowing the public compatibility-seed name to use Goblish terminology.
+const GENERATOR_COMPAT_STATE = 0x8afe8a23;
+const $ = id => document.getElementById(id);
+const coreMap = new Map(CORE.map(e=>[norm(e.English),e]));
+const phraseEntries = CORE.filter(e=>norm(e.English).includes(' ')).sort((a,b)=>tokenWords(b.English).length-tokenWords(a.English).length);
+let custom = loadCustom();
+let contributorName = localStorage.getItem('goblishContributorV05') || localStorage.getItem('goblishContributorV04') || '';
+function norm(s){return String(s).toLowerCase().replace(/[’]/g,"'").trim().replace(/\s+/g,' ')}
+function tokenWords(s){return String(s).match(/[A-Za-zÀ-ÖØ-öø-ÿ]+(?:['’][A-Za-zÀ-ÖØ-öø-ÿ]+)?|\d+|[^\sA-Za-zÀ-ÖØ-öø-ÿ\d]+/g)||[]}
+function isWord(t){return /^[A-Za-zÀ-ÖØ-öø-ÿ]+(?:['’][A-Za-zÀ-ÖØ-öø-ÿ]+)?$/.test(t)}
+function capLike(out,src){if(!out)return out;if(src===src.toUpperCase()&&/[A-Z]/.test(src))return out.toUpperCase();if(/^\p{Lu}/u.test(src))return out[0].toUpperCase()+out.slice(1);return out}
+function fnv1a(str){let h=GENERATOR_COMPAT_STATE;for(const ch of str){h^=ch.codePointAt(0);h=Math.imul(h,0x01000193)>>>0}return h>>>0}
+const ON=['b','bl','br','d','dr','g','gl','gr','k','kr','m','n','p','pl','r','s','sh','sk','sn','t','v','vr','z','zl'];
+const NU=['a','e','i','o','u','ai','oi']; const CO=['','b','d','g','k','m','n','r','s','sh','t','z'];
+function generatedWord(word){const key=norm(word).replace(/[^a-z]/g,'')||'zak';let h=fnv1a(key), n=key.length<=3?1:key.length<=7?2:((h>>>3)%3===0?3:2), parts=[];for(let i=0;i<n;i++){h=(Math.imul(h^((i+1)*2654435761),2246822519)>>>0);let on=ON[h%ON.length];h=((h>>>5)|(h<<27))>>>0;let nu=NU[h%NU.length];h=(Math.imul(h,3266489917)>>>0);let co=CO[h%CO.length];if(i<n-1 && co && ON.includes(co))co='';parts.push(on+nu+co)}let out=parts.join('');out=out.replace(/([aeiou])\1\1/g,'$1$1').replace(/shsh/g,'sh');return out}
+function customMap(){return new Map(custom.map(e=>[norm(e.English),e]))}
+function lookupExact(word){const k=norm(word),cm=customMap();return cm.get(k)||coreMap.get(k)||cm.get('to '+k)||coreMap.get('to '+k)||null}
+function baseCandidates(w,type){let a=[];if(type==='poss'&&/(?:'s|s')$/.test(w))a.push(w.replace(/(?:'s|s')$/,''));if(type==='past'){if(w.endsWith('ied'))a.push(w.slice(0,-3)+'y');if(w.endsWith('ed')){a.push(w.slice(0,-2),w.slice(0,-1));let b=w.slice(0,-2);if(b.length>2&&b.at(-1)===b.at(-2))a.push(b.slice(0,-1))}}
+if(type==='ing'&&w.endsWith('ing')){let b=w.slice(0,-3);a.push(b,b+'e');if(b.length>2&&b.at(-1)===b.at(-2))a.push(b.slice(0,-1))}
+if(type==='plural'){if(w.endsWith('ies'))a.push(w.slice(0,-3)+'y');if(w.endsWith('es'))a.push(w.slice(0,-2),w.slice(0,-1));if(w.endsWith('s')&&!w.endsWith('ss'))a.push(w.slice(0,-1))}
+if(type==='ly'&&w.endsWith('ly'))a.push(w.slice(0,-2));if(type==='est'&&w.endsWith('est'))a.push(w.slice(0,-3),w.slice(0,-2));if(type==='er'&&w.endsWith('er'))a.push(w.slice(0,-2),w.slice(0,-1));return [...new Set(a.filter(Boolean))]}
+const IRREG={brought:{base:'bring',suf:'ta',pos:'verb'},broken:{base:'break',suf:'ta',pos:'adjective'},stole:{base:'steal',suf:'ta',pos:'verb'},made:{base:'make',suf:'ta',pos:'verb'},went:{base:'go',suf:'ta',pos:'verb'},came:{base:'come',suf:'ta',pos:'verb'},ran:{base:'run',suf:'ta',pos:'verb'},ate:{base:'eat',suf:'ta',pos:'verb'},drank:{base:'drink',suf:'ta',pos:'verb'},took:{base:'take',suf:'ta',pos:'verb'},gave:{base:'give',suf:'ta',pos:'verb'},saw:{base:'see',suf:'ta',pos:'verb'},heard:{base:'hear',suf:'ta',pos:'verb'},found:{base:'find',suf:'ta',pos:'verb'},lost:{base:'lose',suf:'ta',pos:'verb'},kept:{base:'keep',suf:'ta',pos:'verb'},thought:{base:'think',suf:'ta',pos:'verb'},knew:{base:'know',suf:'ta',pos:'verb'}};
+function translateWord(src, sentenceStart=false){let clean=norm(src);let exact=lookupExact(clean);if(exact)return {src,out:capLike(exact.Goblish,src),pos:exact['Part of speech']||'other',method:customMap().has(clean)?'custom':'core',note:exact.Notes||''};let irr=IRREG[clean];if(irr){let e=lookupExact(irr.base);if(e)return {src,out:capLike(e.Goblish+irr.suf,src),pos:irr.pos||e['Part of speech'],method:'inflected',note:`${irr.base} + -${irr.suf} (irregular English)`}}
+const preserve=$('preserveNames').checked;if(preserve && /^\p{Lu}/u.test(src) && !sentenceStart)return {src,out:src,pos:'proper noun',method:'preserved',note:'Unknown capitalized name preserved.'};
+const tests=[['poss','esh'],['past','ta'],['ing','um'],['plural','ik'],['ly','sha'],['est','gora'],['er','rak']];
+for(const [type,suf] of tests){for(const b of baseCandidates(clean,type)){let e=lookupExact(b);if(e){return {src,out:capLike(e.Goblish+suf,src),pos:type==='ly'?'adverb':e['Part of speech'],method:'inflected',note:`${b} + -${suf}`}}}}
+let gen=generatedWord(clean);return {src,out:capLike(gen,src),pos:'other',method:'generated',note:'Stable deterministic fallback.'}}
+function allEntriesByPhrase(){return [...custom,...CORE].filter(e=>norm(e.English).includes(' ')).sort((a,b)=>tokenWords(b.English).length-tokenWords(a.English).length)}
+function matchPhrase(tokens,i){for(const e of allEntriesByPhrase()){const p=tokenWords(e.English);if(i+p.length>tokens.length)continue;let ok=true;for(let j=0;j<p.length;j++){if(norm(tokens[i+j])!==norm(p[j])){ok=false;break}}if(ok)return {entry:e,len:p.length}}return null}
+function reorderAdjectives(items){if(!$('gobOrder').checked)return items;let out=[];for(let i=0;i<items.length;){let start=i,j=i,prefix=[],adjs=[];while(j<items.length&&items[j].pos==='determiner')prefix.push(items[j++]);while(j<items.length&&items[j].pos==='adjective')adjs.push(items[j++]);if(adjs.length&&j<items.length&&['noun','proper noun'].includes(items[j].pos)){out.push(...prefix,items[j],...adjs);i=j+1}else{out.push(items[start]);i=start+1}}return out}
+function translateText(text){const tokens=tokenWords(text);let units=[], sentenceStart=true;for(let i=0;i<tokens.length;){let t=tokens[i];if(isWord(t)){let pm=matchPhrase(tokens,i);if(pm){let e=pm.entry;units.push({src:tokens.slice(i,i+pm.len).join(' '),out:capLike(e.Goblish,tokens[i]),pos:e['Part of speech']||'phrase',method:custom.some(c=>norm(c.English)===norm(e.English))?'custom':'core',note:e.Notes||'',punct:false});i+=pm.len;sentenceStart=false;continue}let u=translateWord(t,sentenceStart);u.punct=false;units.push(u);sentenceStart=false;i++}else{units.push({src:t,out:t,pos:'punctuation',method:'punctuation',note:'',punct:true});if(/[.!?]/.test(t))sentenceStart=true;i++}}
+// Reorder within punctuation-delimited runs
+let reordered=[],run=[];const flush=()=>{if(run.length){reordered.push(...reorderAdjectives(run));run=[]}};for(const u of units){if(u.punct){flush();reordered.push(u)}else run.push(u)}flush();
+// Add question particle before ?
+if($('addQuestion').checked){for(let i=0;i<reordered.length;i++){if(reordered[i].punct&&reordered[i].out.includes('?')){let j=i-1;while(j>=0&&reordered[j].punct)j--;if(j>=0&&norm(reordered[j].out)!=='ra'){reordered.splice(i,0,{src:'[question]',out:'ra',pos:'particle',method:'grammar',note:'Sentence-final question particle.',punct:false});i++}}}}
+let s='';for(let i=0;i<reordered.length;i++){const u=reordered[i], prev=reordered[i-1];if(u.punct){if(/^[,.;:!?%)\]}]+$/.test(u.out))s=s.trimEnd()+u.out;else if(/^[([\{]+$/.test(u.out))s+=(s&& !s.endsWith(' ')?' ':'')+u.out;else s+=(s?' ':'')+u.out}else{let need=s && !s.endsWith(' ') && !(prev&&prev.punct&&/^[([\{]+$/.test(prev.out));if(need)s+=' ';s+=u.out}}return {text:s.trim(),units:reordered}}
+function renderBreakdown(units){let rows=units.filter(u=>!u.punct).map(u=>`<tr><td>${esc(u.src)}</td><td><b>${esc(u.out)}</b></td><td>${esc(u.pos)}</td><td>${esc(u.method)}</td><td>${esc(u.note||'')}</td></tr>`).join('');$('breakdown').innerHTML=`<table><thead><tr><th>English</th><th>Goblish</th><th>Role</th><th>Source</th><th>Note</th></tr></thead><tbody>${rows||'<tr><td colspan="5">No translation yet.</td></tr>'}</tbody></table>`}
+function doTranslate(){const r=translateText($('input').value);$('output').value=r.text;renderBreakdown(r.units);$('status').textContent=`Translated with ${CORE.length} core entries and ${custom.length} custom entries.`}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function loadCustom(){try{let arr=JSON.parse(localStorage.getItem('goblishCustomV05')||localStorage.getItem('goblishCustomV04')||localStorage.getItem('goblishCustomV03')||localStorage.getItem('gribblikCustomV02')||'[]');return Array.isArray(arr)?arr.map(e=>({...e,Approved:Boolean(e.Approved)})):[]}catch{return []}}
+function saveCustom(){localStorage.setItem('goblishCustomV05',JSON.stringify(custom));renderCustom();doTranslate()}
+function reviewState(e){const core=coreMap.get(norm(e.English));if(!core)return {key:'new',label:'New entry',core:''};if(norm(core.Goblish)===norm(e.Goblish))return {key:'match',label:'Matches core',core:core.Goblish};return {key:'override',label:'Changes core',core:core.Goblish}}
+function renderCustom(){
+ let rows=custom.slice().sort((a,b)=>a.English.localeCompare(b.English)).map(e=>{
+   const state=reviewState(e);
+   const title=state.core?`Built-in Goblish: ${state.core}`:'No built-in entry';
+   return `<tr><td>${esc(e.English)}</td><td><b>${esc(e.Goblish)}</b></td><td>${esc(e['Part of speech']||'other')}</td><td><span class="review-pill review-${state.key}" title="${esc(title)}">${esc(state.label)}</span></td><td>${esc(e.Contributor||'Unspecified')}</td><td>${esc(e.Notes||'')}</td><td style="text-align:center"><input class="approve-box" type="checkbox" data-approve="${esc(e.English)}" ${e.Approved?'checked':''} aria-label="Approve ${esc(e.English)} for next build"></td><td><button class="light" data-del="${esc(e.English)}">Delete</button></td></tr>`
+ }).join('');
+ $('customList').innerHTML=`<table><thead><tr><th>English</th><th>Goblish</th><th>Role</th><th>Comparison</th><th>Contributor</th><th>Notes</th><th>GM approve</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="8">No proposed entries.</td></tr>'}</tbody></table>`;
+ document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{custom=custom.filter(e=>norm(e.English)!==norm(b.dataset.del));saveCustom()});
+ document.querySelectorAll('[data-approve]').forEach(box=>box.onchange=()=>{const e=custom.find(x=>norm(x.English)===norm(box.dataset.approve));if(e){e.Approved=box.checked;saveCustom()}});
+ const approved=custom.filter(e=>e.Approved).length;
+ $('contributionStatus').textContent=`${custom.length} proposed entr${custom.length===1?'y':'ies'} stored here; ${approved} approved for the next build.`;
+}
+function downloadText(filename,text,type){const blob=new Blob([text],{type:type||'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function contributionBundle(entries=custom,schema='goblish-contribution-1'){return {schema,translatorVersion:'Goblish v0.5.1',seed:VERSION_SEED,exportedBy:$('contributorName').value.trim()||'Unspecified',exportedAt:new Date().toISOString(),entries:entries.map(e=>({English:e.English,Goblish:e.Goblish,'Part of speech':e['Part of speech']||'other',Category:e.Category||'Player proposal',Notes:e.Notes||'',Contributor:e.Contributor||'Unspecified',ProposedAt:e.ProposedAt||'',Approved:Boolean(e.Approved)}))}}
+$('contributorName').value=contributorName;
+$('contributorName').oninput=e=>{contributorName=e.target.value;localStorage.setItem('goblishContributorV05',contributorName)};
+$('addCustom').onclick=()=>{
+ let en=$('customEnglish').value.trim(),go=$('customGob').value.trim();
+ if(!en||!go){$('status').textContent='Enter both English and Goblish.';return}
