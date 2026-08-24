@@ -1,0 +1,36 @@
+ const existing=custom.find(x=>norm(x.English)===norm(en));
+ let entry={English:en,Goblish:go,'Part of speech':$('customPos').value,Category:'Player proposal',Notes:$('customNotes').value.trim(),Contributor:$('contributorName').value.trim()||existing?.Contributor||'Unspecified',ProposedAt:existing?.ProposedAt||new Date().toISOString(),Approved:existing?.Approved||false};
+ custom=custom.filter(x=>norm(x.English)!==norm(en));custom.push(entry);
+ ['customEnglish','customGob','customNotes'].forEach(id=>$(id).value='');saveCustom();$('status').textContent='Proposed entry saved locally.';
+};
+$('exportContribution').onclick=()=>{if(!custom.length){$('status').textContent='There are no proposed words to export.';return}downloadText('goblish_contribution_v0_5_1.json',JSON.stringify(contributionBundle(),null,2),'application/json')};
+$('exportApproved').onclick=()=>{const approved=custom.filter(e=>e.Approved);if(!approved.length){$('status').textContent='No entries are marked as approved.';return}downloadText('goblish_approved_for_next_build.json',JSON.stringify(contributionBundle(approved,'goblish-approved-lexicon-1'),null,2),'application/json');$('status').textContent=`Exported ${approved.length} approved entr${approved.length===1?'y':'ies'} for the next build.`};
+$('importCustom').onchange=async e=>{
+ try{
+  let data=JSON.parse(await e.target.files[0].text()),arr=Array.isArray(data)?data:data.entries;
+  if(!Array.isArray(arr))throw Error('No entries array');
+  const fallbackContributor=data.exportedBy||data.contributor||'Imported';
+  let imported=0;
+  for(const x of arr){
+   let gv=x.Goblish||x.Gribblik;
+   if(x.English&&gv){
+    custom=custom.filter(y=>norm(y.English)!==norm(x.English));
+    custom.push({English:x.English,Goblish:gv,'Part of speech':x['Part of speech']||x.pos||'other',Category:x.Category||'Imported proposal',Notes:x.Notes||x.notes||'',Contributor:x.Contributor||fallbackContributor,ProposedAt:x.ProposedAt||data.exportedAt||'',Approved:Boolean(x.Approved)});
+    imported++;
+   }
+  }
+  saveCustom();$('status').textContent=`Imported ${imported} proposed entr${imported===1?'y':'ies'}.`;
+ }catch(err){$('status').textContent=`Import failed: ${err.message}`}
+ e.target.value='';
+};
+$('eraseCustom').onclick=()=>{if(confirm('Erase all proposed Goblish entries stored in this browser?')){custom=[];saveCustom()}};
+$('search').oninput=e=>renderGlossary(e.target.value);
+const translationBreakdown=$('translationBreakdown');
+if(translationBreakdown) translationBreakdown.open=false;
+renderCustom();renderGlossary();doTranslate();
+
+window.addEventListener('pageshow',()=>{
+  const d=document.getElementById('translationBreakdown');
+  if(d) d.open=false;
+});
+</script></body></html>
