@@ -57,7 +57,29 @@ function renderCustom(){
  $('contributionStatus').textContent=`${custom.length} proposed entr${custom.length===1?'y':'ies'} stored here; ${approved} approved for the next build.`;
 }
 function downloadText(filename,text,type){const blob=new Blob([text],{type:type||'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
-function contributionBundle(entries=custom,schema='goblish-contribution-1'){return {schema,translatorVersion:'Goblish v0.5.1',seed:VERSION_SEED,exportedBy:$('contributorName').value.trim()||'Unspecified',exportedAt:new Date().toISOString(),entries:entries.map(e=>({English:e.English,Goblish:e.Goblish,'Part of speech':e['Part of speech']||'other',Category:e.Category||'Player proposal',Notes:e.Notes||'',Contributor:e.Contributor||'Unspecified',ProposedAt:e.ProposedAt||'',Approved:Boolean(e.Approved)}))}}
+function contributionBundle(entries=custom,schema='goblish-contribution-1'){return {schema,translatorVersion:'Goblish v0.5.3',seed:VERSION_SEED,exportedBy:$('contributorName').value.trim()||'Unspecified',exportedAt:new Date().toISOString(),entries:entries.map(e=>({English:e.English,Goblish:e.Goblish,'Part of speech':e['Part of speech']||'other',Category:e.Category||'Player proposal',Notes:e.Notes||'',Contributor:e.Contributor||'Unspecified',ProposedAt:e.ProposedAt||'',Approved:Boolean(e.Approved)}))}}
+$('translate').onclick=doTranslate;
+$('input').addEventListener('input',doTranslate);
+['gobOrder','preserveNames','addQuestion'].forEach(id=>$(id).onchange=doTranslate);
+$('copy').onclick=async()=>{
+  try{
+    await navigator.clipboard.writeText($('output').value);
+    $('status').textContent='Copied Goblish to the clipboard.';
+  }catch{
+    $('output').focus();
+    $('output').select();
+    $('status').textContent='Select and copy the Goblish text manually.';
+  }
+};
+$('speak').onclick=()=>{
+  if(!('speechSynthesis' in window)){ $('status').textContent='Speak aloud is not supported by this browser.'; return; }
+  speechSynthesis.cancel();
+  let u=new SpeechSynthesisUtterance($('output').value);
+  u.rate=.85;
+  u.pitch=1.15;
+  speechSynthesis.speak(u);
+};
+$('clear').onclick=()=>{$('input').value='';doTranslate();$('input').focus()};
 $('contributorName').value=contributorName;
 $('contributorName').oninput=e=>{contributorName=e.target.value;localStorage.setItem('goblishContributorV05',contributorName)};
 $('addCustom').onclick=()=>{
